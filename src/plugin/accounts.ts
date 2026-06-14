@@ -79,6 +79,11 @@ export function parseRateLimitReason(
       return "RATE_LIMIT_EXCEEDED";
     }
 
+    // Hourly / Sprint Limits (Short Wait) - Check BEFORE "exhausted" / "quota"
+    if (lower.includes("hourly") || lower.includes("sprint") || lower.includes("5-hour")) {
+      return "RATE_LIMIT_EXCEEDED";
+    }
+
     // Quota (Long Wait)
     if (lower.includes("exhausted") || lower.includes("quota")) {
       return "QUOTA_EXHAUSTED";

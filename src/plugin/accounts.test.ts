@@ -1195,6 +1195,9 @@ describe("AccountManager", () => {
         expect(parseRateLimitReason(undefined, "Rate limit exceeded per minute")).toBe("RATE_LIMIT_EXCEEDED");
         expect(parseRateLimitReason(undefined, "Too many requests")).toBe("RATE_LIMIT_EXCEEDED");
         expect(parseRateLimitReason(undefined, "Quota exhausted for today")).toBe("QUOTA_EXHAUSTED");
+        expect(parseRateLimitReason(undefined, "Hourly rate limit reached")).toBe("RATE_LIMIT_EXCEEDED");
+        expect(parseRateLimitReason(undefined, "sprint quota exhausted")).toBe("RATE_LIMIT_EXCEEDED");
+        expect(parseRateLimitReason(undefined, "5-hour quota has been exceeded")).toBe("RATE_LIMIT_EXCEEDED");
       });
 
       it("returns UNKNOWN when no pattern matches", () => {

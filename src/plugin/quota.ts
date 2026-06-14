@@ -27,6 +27,26 @@ export interface QuotaSummary {
   error?: string;
 }
 
+export interface QuotaSummaryBucket {
+  bucketId?: string;
+  displayName?: string;
+  window?: string;
+  resetTime?: string;
+  remainingFraction?: number;
+  disabled?: boolean;
+}
+
+export interface QuotaSummaryGroup {
+  displayName?: string;
+  description?: string;
+  buckets?: QuotaSummaryBucket[];
+}
+
+export interface RetrieveUserQuotaSummaryResponse {
+  groups?: QuotaSummaryGroup[];
+  description?: string;
+}
+
 // Gemini CLI quota types
 export interface GeminiCliQuotaModel {
   modelId: string;
@@ -112,15 +132,29 @@ function classifyQuotaGroup(modelName: string, displayName?: string): QuotaGroup
   if (combined.includes("claude")) {
     return "claude";
   }
-  const isGemini3 = combined.includes("gemini-3") || combined.includes("gemini 3");
-  if (!isGemini3) {
+  const isGemini = combined.includes("gemini");
+  if (!isGemini) {
     return null;
   }
   const family = getModelFamily(modelName);
   return family === "gemini-flash" ? "gemini-flash" : "gemini-pro";
 }
 
-function aggregateQuota(models?: Record<string, FetchAvailableModelEntry>): QuotaSummary {
+function getQuotaGroupsForSummaryGroup(displayName?: string): QuotaGroup[] {
+  const lower = (displayName ?? "").toLowerCase();
+  if (lower.includes("claude") || lower.includes("gpt")) {
+    return ["claude"];
+  }
+  if (lower.includes("gemini")) {
+    return ["gemini-pro", "gemini-flash"];
+  }
+  return [];
+}
+
+function aggregateQuota(
+  models?: Record<string, FetchAvailableModelEntry>,
+  quotaSummary?: RetrieveUserQuotaSummaryResponse
+): QuotaSummary {
   const groups: Partial<Record<QuotaGroup, QuotaGroupSummary>> = {};
   if (!models) {
     return { groups, modelCount: 0 };
@@ -169,6 +203,42 @@ function aggregateQuota(models?: Record<string, FetchAvailableModelEntry>): Quot
     };
   }
 
+  // Merge quota summary buckets if available
+  if (quotaSummary?.groups) {
+    for (const group of quotaSummary.groups) {
+      const targetGroups = getQuotaGroupsForSummaryGroup(group.displayName);
+      if (targetGroups.length === 0 || !group.buckets) {
+        continue;
+      }
+
+      let minFraction: number | undefined;
+      let minResetTime: string | undefined;
+
+      for (const bucket of group.buckets) {
+        if (bucket.disabled || bucket.remainingFraction === undefined) {
+          continue;
+        }
+
+        const fraction = normalizeRemainingFraction(bucket.remainingFraction);
+        if (minFraction === undefined || fraction < minFraction) {
+          minFraction = fraction;
+          minResetTime = bucket.resetTime;
+        }
+      }
+
+      if (minFraction !== undefined) {
+        for (const qg of targetGroups) {
+          const existing = groups[qg] || { modelCount: 0 };
+          groups[qg] = {
+            ...existing,
+            remainingFraction: minFraction,
+            resetTime: minResetTime,
+          };
+        }
+      }
+    }
+  }
+
   return { groups, modelCount: totalCount };
 }
 
@@ -212,6 +282,32 @@ async function fetchAvailableModels(
   );
 
   throw new Error(errors.join("; ") || "fetchAvailableModels failed");
+}
+
+async function fetchAntigravityQuotaSummary(
+  accessToken: string,
+  projectId: string,
+): Promise<RetrieveUserQuotaSummaryResponse | undefined> {
+  const endpoint = ANTIGRAVITY_ENDPOINT_PROD;
+  const quotaUserAgent = getAntigravityHeaders()["User-Agent"] || "antigravity/windows/amd64";
+
+  const body = projectId ? { project: projectId } : {};
+  try {
+    const response = await fetchWithTimeout(`${endpoint}/v1internal:retrieveUserQuotaSummary`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        "User-Agent": quotaUserAgent,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (response.ok) {
+      return (await response.json()) as RetrieveUserQuotaSummaryResponse;
+    }
+  } catch {}
+  return undefined;
 }
 
 async function fetchGeminiCliQuota(
@@ -337,10 +433,12 @@ export async function checkAccountsQuota(
       let quotaResult: QuotaSummary;
       let geminiCliQuotaResult: GeminiCliQuotaSummary;
       
-      // Fetch both Antigravity and Gemini CLI quotas in parallel
-      const [antigravityResponse, geminiCliResponse] = await Promise.all([
+      // Fetch Antigravity models, quota summary, and Gemini CLI quotas in parallel
+      const [antigravityResponse, quotaSummaryResponse, geminiCliResponse] = await Promise.all([
         fetchAvailableModels(auth.access ?? "", projectContext.effectiveProjectId)
           .catch((error): FetchAvailableModelsResponse => ({ models: undefined })),
+        fetchAntigravityQuotaSummary(auth.access ?? "", projectContext.effectiveProjectId)
+          .catch(() => undefined),
         fetchGeminiCliQuota(auth.access ?? "", projectContext.effectiveProjectId),
       ]);
 
@@ -352,7 +450,7 @@ export async function checkAccountsQuota(
           error: "Failed to fetch Antigravity quota",
         };
       } else {
-        quotaResult = aggregateQuota(antigravityResponse.models);
+        quotaResult = aggregateQuota(antigravityResponse.models, quotaSummaryResponse);
       }
 
       // Process Gemini CLI quota

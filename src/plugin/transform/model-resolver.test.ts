@@ -116,6 +116,30 @@ describe("resolveModelWithTier", () => {
       expect(result.actualModel).toBe("gemini-3.1-pro-low");
       expect(result.thinkingLevel).toBe("low");
     });
+
+    it("antigravity-gemini-3.5-flash gets default -low model ID gemini-3.5-flash-low", () => {
+      const result = resolveModelWithTier("antigravity-gemini-3.5-flash");
+      expect(result.actualModel).toBe("gemini-3.5-flash-low");
+      expect(result.thinkingLevel).toBe("low");
+    });
+
+    it("antigravity-gemini-3.5-flash-low maps to API ID gemini-3.5-flash-extra-low", () => {
+      const result = resolveModelWithTier("antigravity-gemini-3.5-flash-low");
+      expect(result.actualModel).toBe("gemini-3.5-flash-extra-low");
+      expect(result.thinkingLevel).toBe("low");
+    });
+
+    it("antigravity-gemini-3.5-flash-medium maps to API ID gemini-3.5-flash-low", () => {
+      const result = resolveModelWithTier("antigravity-gemini-3.5-flash-medium");
+      expect(result.actualModel).toBe("gemini-3.5-flash-low");
+      expect(result.thinkingLevel).toBe("medium");
+    });
+
+    it("antigravity-gemini-3.5-flash-high maps to API ID gemini-3-flash-agent", () => {
+      const result = resolveModelWithTier("antigravity-gemini-3.5-flash-high");
+      expect(result.actualModel).toBe("gemini-3-flash-agent");
+      expect(result.thinkingLevel).toBe("high");
+    });
   });
 
   describe("Claude thinking models default budget", () => {

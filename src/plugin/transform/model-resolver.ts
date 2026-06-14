@@ -55,14 +55,34 @@ export const MODEL_ALIASES: Record<string, string> = {
   "gemini-claude-sonnet-4-6": "claude-sonnet-4-6",
 
   // Image generation models - only gemini-3-pro-image is available via Antigravity API
-  // Note: gemini-2.5-flash-image (Nano Banana) is NOT supported by Antigravity - only Google AI API
-  // Reference: Antigravity-Manager/src-tauri/src/proxy/common/model_mapping.rs
+  // Gemini 3.5 Flash variants
+  "gemini-3.5-flash-low": "gemini-3.5-flash",
+  "gemini-3.5-flash-medium": "gemini-3.5-flash",
+  "gemini-3.5-flash-high": "gemini-3.5-flash",
 };
 
 const TIER_REGEX = /-(minimal|low|medium|high)$/;
 const QUOTA_PREFIX_REGEX = /^antigravity-/i;
 const GEMINI_3_PRO_REGEX = /^gemini-3(?:\.\d+)?-pro/i;
-const GEMINI_3_FLASH_REGEX = /^gemini-3(?:\.\d+)?-flash/i;
+const GEMINI_3_FLASH_REGEX = /^gemini-3(?:\.[0-1])?-flash/i;
+
+function isGemini35FlashModel(model: string): boolean {
+  const lower = model.toLowerCase();
+  return lower.startsWith("gemini-3.5-flash") || lower === "gemini-3-flash-agent";
+}
+
+function resolveGemini35FlashModelId(tier: ThinkingTier | undefined): string {
+  if (tier === "low") {
+    return "gemini-3.5-flash-extra-low";
+  }
+  if (tier === "medium") {
+    return "gemini-3.5-flash-low";
+  }
+  if (tier === "high") {
+    return "gemini-3-flash-agent";
+  }
+  return "gemini-3.5-flash-low"; // Default is medium
+}
 
 // ANTIGRAVITY_ONLY_MODELS removed - all models now default to antigravity
 
@@ -122,11 +142,13 @@ function getBudgetFamily(model: string): keyof typeof THINKING_TIER_BUDGETS {
  */
 function isThinkingCapableModel(model: string): boolean {
   const lower = model.toLowerCase();
-  return (
-    lower.includes("thinking") ||
-    lower.includes("gemini-3") ||
-    lower.includes("gemini-2.5")
-  );
+  if (lower.includes("thinking")) return true;
+  const geminiMatch = lower.match(/gemini-(\d+)(?:\.\d+)?/);
+  if (geminiMatch) {
+    const version = parseFloat(geminiMatch[1]!);
+    if (version >= 3) return true;
+  }
+  return lower.includes("gemini-2.5");
 }
 
 function isGemini3ProModel(model: string): boolean {
@@ -162,7 +184,10 @@ export function resolveModelWithTier(requestedModel: string, options: ModelResol
   const modelWithoutQuota = requestedModel.replace(QUOTA_PREFIX_REGEX, "");
 
   const tier = extractThinkingTierFromModel(modelWithoutQuota);
-  const baseName = tier ? modelWithoutQuota.replace(TIER_REGEX, "") : modelWithoutQuota;
+  let baseName = tier ? modelWithoutQuota.replace(TIER_REGEX, "") : modelWithoutQuota;
+  if (isGemini35FlashModel(modelWithoutQuota)) {
+    baseName = "gemini-3.5-flash";
+  }
 
   const isImageModel = IMAGE_GENERATION_MODELS.test(modelWithoutQuota);
   const isClaudeModel = modelWithoutQuota.toLowerCase().includes("claude");
@@ -176,16 +201,18 @@ export function resolveModelWithTier(requestedModel: string, options: ModelResol
   const isGemini3 = modelWithoutQuota.toLowerCase().startsWith("gemini-3");
   const skipAlias = isAntigravity && isGemini3;
 
-  // For Antigravity Gemini 3 Pro models without explicit tier, append default tier
-  // Antigravity API: gemini-3-pro requires tier suffix (gemini-3-pro-low/high)
+  // For Antigravity Gemini 3 Pro / 3.5 Flash models without explicit tier, append default tier
+  // Antigravity API: gemini-3-pro / gemini-3.5-flash require tier suffix (gemini-3-pro-low/high, gemini-3.5-flash-low/medium/high)
   //                  gemini-3-flash uses bare name + thinkingLevel param
-  // Pro defaults to -low unless an explicit tier is provided
+  // Pro/3.5-Flash default to -low unless an explicit tier is provided
   const isGemini3Pro = isGemini3ProModel(modelWithoutQuota);
   const isGemini3Flash = isGemini3FlashModel(modelWithoutQuota);
   
   let antigravityModel = modelWithoutQuota;
   if (skipAlias) {
-    if (isGemini3Pro && !tier && !isImageModel) {
+    if (isGemini35FlashModel(modelWithoutQuota)) {
+      antigravityModel = resolveGemini35FlashModelId(tier);
+    } else if (isGemini3Pro && !tier && !isImageModel) {
       antigravityModel = `${modelWithoutQuota}-low`;
     } else if (isGemini3Flash && tier) {
       antigravityModel = baseName;
@@ -324,12 +351,12 @@ export function resolveModelForHeaderStyle(
       .replace(/-preview$/i, "")
       .replace(/^antigravity-/i, "");
     
-    const isGemini3Pro = isGemini3ProModel(transformedModel);
-    const hasTierSuffix = /-(low|medium|high)$/i.test(transformedModel);
+    const isGemini3ProOr35Flash = isGemini3ProModel(transformedModel) || isGemini35FlashModel(transformedModel);
+    const hasTierSuffix = /-(low|medium|high|extra-low|agent)$/i.test(transformedModel);
     const isImageModel = IMAGE_GENERATION_MODELS.test(transformedModel);
     
     // Don't add tier suffix to image models - they don't support thinking
-    if (isGemini3Pro && !hasTierSuffix && !isImageModel) {
+    if (isGemini3ProOr35Flash && !hasTierSuffix && !isImageModel) {
       transformedModel = `${transformedModel}-low`;
     }
     
@@ -340,7 +367,7 @@ export function resolveModelForHeaderStyle(
   if (headerStyle === "gemini-cli") {
     let transformedModel = requestedModel
       .replace(/^antigravity-/i, "")
-      .replace(/-(low|medium|high)$/i, "");
+      .replace(/-(low|medium|high|extra-low|agent)$/i, "");
 
     const hasPreviewSuffix = /-preview($|-)/i.test(transformedModel);
     if (!hasPreviewSuffix) {
@@ -385,13 +412,17 @@ export function resolveModelWithVariant(
 
   if (isGemini3) {
     const level = budgetToGemini3Level(budget);
-    const isAntigravityGemini3Pro = base.quotaPreference === "antigravity" &&
-      isGemini3ProModel(base.actualModel);
+    const isAntigravityGemini3ProOr35Flash = base.quotaPreference === "antigravity" &&
+      (isGemini3ProModel(base.actualModel) || isGemini35FlashModel(base.actualModel));
 
     let actualModel = base.actualModel;
-    if (isAntigravityGemini3Pro) {
-      const baseModel = base.actualModel.replace(/-(low|medium|high)$/, "");
-      actualModel = `${baseModel}-${level}`;
+    if (isAntigravityGemini3ProOr35Flash) {
+      if (isGemini35FlashModel(base.actualModel)) {
+        actualModel = resolveGemini35FlashModelId(level);
+      } else {
+        const baseModel = base.actualModel.replace(/-(low|medium|high)$/, "");
+        actualModel = `${baseModel}-${level}`;
+      }
     }
 
     return {
