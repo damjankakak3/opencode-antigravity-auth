@@ -707,7 +707,7 @@ describe("applyClaudeTransforms", () => {
     const payload: RequestPayload = {};
     
     applyClaudeTransforms(payload, {
-      model: "claude-sonnet-4-6",
+      model: "claude-3-haiku",
       normalizedThinking: { includeThoughts: true, thinkingBudget: 8192 },
       cleanJSONSchema: mockCleanJSONSchema,
     });
@@ -750,7 +750,7 @@ describe("applyClaudeTransforms", () => {
     };
     
     applyClaudeTransforms(payload, {
-      model: "claude-sonnet-4-6",
+      model: "claude-3-haiku",
       cleanJSONSchema: mockCleanJSONSchema,
     });
     

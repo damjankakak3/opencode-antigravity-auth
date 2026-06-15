@@ -152,29 +152,46 @@ describe("resolveModelWithTier", () => {
     });
   });
 
-  describe("Claude Sonnet 4.6 (non-thinking)", () => {
-    it("claude-sonnet-4-6 resolves as non-thinking model", () => {
+  describe("Claude Sonnet 4.6 (thinking)", () => {
+    it("claude-sonnet-4-6 resolves as thinking model with default budget", () => {
       const result = resolveModelWithTier("claude-sonnet-4-6");
       expect(result.actualModel).toBe("claude-sonnet-4-6");
-      expect(result.isThinkingModel).toBe(false);
-      expect(result.thinkingBudget).toBeUndefined();
+      expect(result.isThinkingModel).toBe(true);
+      expect(result.thinkingBudget).toBe(32768);
       expect(result.quotaPreference).toBe("antigravity");
     });
 
-    it("antigravity-claude-sonnet-4-6 resolves as non-thinking model with explicit quota", () => {
+    it("antigravity-claude-sonnet-4-6 resolves as thinking model with explicit quota", () => {
       const result = resolveModelWithTier("antigravity-claude-sonnet-4-6");
       expect(result.actualModel).toBe("claude-sonnet-4-6");
-      expect(result.isThinkingModel).toBe(false);
-      expect(result.thinkingBudget).toBeUndefined();
+      expect(result.isThinkingModel).toBe(true);
+      expect(result.thinkingBudget).toBe(32768);
       expect(result.quotaPreference).toBe("antigravity");
       expect(result.explicitQuota).toBe(true);
     });
 
-    it("gemini-claude-sonnet-4-6 alias resolves to claude-sonnet-4-6", () => {
+    it("gemini-claude-sonnet-4-6 alias resolves to claude-sonnet-4-6 with thinking", () => {
       const result = resolveModelWithTier("gemini-claude-sonnet-4-6");
       expect(result.actualModel).toBe("claude-sonnet-4-6");
-      expect(result.isThinkingModel).toBe(false);
+      expect(result.isThinkingModel).toBe(true);
+      expect(result.thinkingBudget).toBe(32768);
       expect(result.quotaPreference).toBe("antigravity");
+    });
+
+    it("claude-sonnet-4-6-low resolves with low thinking budget", () => {
+      const result = resolveModelWithTier("claude-sonnet-4-6-low");
+      expect(result.actualModel).toBe("claude-sonnet-4-6");
+      expect(result.isThinkingModel).toBe(true);
+      expect(result.thinkingBudget).toBe(8192);
+      expect(result.tier).toBe("low");
+    });
+
+    it("claude-sonnet-4-6-high resolves with high thinking budget", () => {
+      const result = resolveModelWithTier("claude-sonnet-4-6-high");
+      expect(result.actualModel).toBe("claude-sonnet-4-6");
+      expect(result.isThinkingModel).toBe(true);
+      expect(result.thinkingBudget).toBe(32768);
+      expect(result.tier).toBe("high");
     });
   });
 

@@ -738,7 +738,8 @@ export function isThinkingCapableModel(modelName: string): boolean {
   const lowerModel = modelName.toLowerCase();
   return lowerModel.includes("thinking")
     || lowerModel.includes("gemini-3")
-    || lowerModel.includes("opus");
+    || lowerModel.includes("opus")
+    || lowerModel.includes("claude-sonnet-4-6");
 }
 
 /**

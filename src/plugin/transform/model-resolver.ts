@@ -53,6 +53,9 @@ export const MODEL_ALIASES: Record<string, string> = {
   "gemini-claude-opus-4-6-thinking-medium": "claude-opus-4-6-thinking",
   "gemini-claude-opus-4-6-thinking-high": "claude-opus-4-6-thinking",
   "gemini-claude-sonnet-4-6": "claude-sonnet-4-6",
+  "gemini-claude-sonnet-4-6-low": "claude-sonnet-4-6",
+  "gemini-claude-sonnet-4-6-medium": "claude-sonnet-4-6",
+  "gemini-claude-sonnet-4-6-high": "claude-sonnet-4-6",
 
   // Image generation models - only gemini-3-pro-image is available via Antigravity API
   // Gemini 3.5 Flash variants
@@ -104,7 +107,8 @@ function supportsThinkingTiers(model: string): boolean {
   return (
     lower.includes("gemini-3") ||
     lower.includes("gemini-2.5") ||
-    (lower.includes("claude") && lower.includes("thinking"))
+    (lower.includes("claude") && lower.includes("thinking")) ||
+    lower.includes("claude-sonnet-4-6")
   );
 }
 
@@ -148,7 +152,7 @@ function isThinkingCapableModel(model: string): boolean {
     const version = parseFloat(geminiMatch[1]!);
     if (version >= 3) return true;
   }
-  return lower.includes("gemini-2.5");
+  return lower.includes("gemini-2.5") || lower.includes("claude-sonnet-4-6");
 }
 
 function isGemini3ProModel(model: string): boolean {
@@ -240,7 +244,8 @@ export function resolveModelWithTier(requestedModel: string, options: ModelResol
 
   // Check if this is a Gemini 3 model (works for both aliased and skipAlias paths)
   const isEffectiveGemini3 = resolvedModel.toLowerCase().includes("gemini-3");
-  const isClaudeThinking = resolvedModel.toLowerCase().includes("claude") && resolvedModel.toLowerCase().includes("thinking");
+  const isClaudeThinking = (resolvedModel.toLowerCase().includes("claude") && resolvedModel.toLowerCase().includes("thinking"))
+    || resolvedModel.toLowerCase().includes("claude-sonnet-4-6");
 
   if (!tier) {
     // Gemini 3 models without explicit tier get a default thinkingLevel

@@ -962,11 +962,9 @@ export function prepareAntigravityRequest(
         const hasAssistantHistory = Array.isArray(requestPayload.contents) &&
           requestPayload.contents.some((c: any) => c?.role === "model" || c?.role === "assistant");
 
-        // Claude Sonnet 4.6 is non-thinking only.
-        // Ignore any client-provided thinkingConfig for this model.
-        const lowerEffective = effectiveModel.toLowerCase();
-        const isClaudeSonnetNonThinking = lowerEffective === "claude-sonnet-4-6";
-        const effectiveUserThinkingConfig = (isClaudeSonnetNonThinking || isImageModel) ? undefined : userThinkingConfig;
+        // Note: Claude Sonnet 4.6 now supports extended thinking natively.
+        // Thinking config is handled by isClaudeThinkingModel() in claude.ts.
+        const effectiveUserThinkingConfig = isImageModel ? undefined : userThinkingConfig;
 
         // For image models, add imageConfig instead of thinkingConfig
         if (isImageModel) {
@@ -1004,7 +1002,7 @@ export function prepareAntigravityRequest(
         } else {
           const finalThinkingConfig = resolveThinkingConfig(
             effectiveUserThinkingConfig,
-            isClaudeSonnetNonThinking ? false : (resolved.isThinkingModel ?? isThinkingCapableModel(effectiveModel)),
+            resolved.isThinkingModel ?? isThinkingCapableModel(effectiveModel),
             isClaude,
             hasAssistantHistory,
           );

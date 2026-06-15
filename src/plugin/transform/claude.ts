@@ -33,7 +33,10 @@ export function isClaudeModel(model: string): boolean {
  */
 export function isClaudeThinkingModel(model: string): boolean {
   const lower = model.toLowerCase();
-  return lower.includes("claude") && lower.includes("thinking");
+  // Sonnet 4.6 supports extended thinking natively (same as Opus)
+  // even though its model name doesn't contain "-thinking"
+  return (lower.includes("claude") && lower.includes("thinking"))
+    || lower.includes("claude-sonnet-4-6");
 }
 
 /**
