@@ -62,6 +62,11 @@ export const MODEL_ALIASES: Record<string, string> = {
   "gemini-3.5-flash-low": "gemini-3.5-flash",
   "gemini-3.5-flash-medium": "gemini-3.5-flash",
   "gemini-3.5-flash-high": "gemini-3.5-flash",
+
+  // Gemini 3.8 Flash variants
+  "gemini-3.8-flash-low": "gemini-3.8-flash",
+  "gemini-3.8-flash-medium": "gemini-3.8-flash",
+  "gemini-3.8-flash-high": "gemini-3.8-flash",
 };
 
 const TIER_REGEX = /-(minimal|low|medium|high)$/;
@@ -85,6 +90,16 @@ function resolveGemini35FlashModelId(tier: ThinkingTier | undefined): string {
     return "gemini-3-flash-agent";
   }
   return "gemini-3.5-flash-low"; // Default is medium
+}
+
+/**
+ * Gemini 3.8 Flash is a "tiered" model on Antigravity: one API model ID for every tier,
+ * with low/medium/high selected through the thinkingLevel param (minimal is rejected).
+ */
+const GEMINI_38_FLASH_API_MODEL = "gemini-3.8-flash-tiered";
+
+function isGemini38FlashModel(model: string): boolean {
+  return model.toLowerCase().startsWith("gemini-3.8-flash");
 }
 
 // ANTIGRAVITY_ONLY_MODELS removed - all models now default to antigravity
@@ -191,6 +206,8 @@ export function resolveModelWithTier(requestedModel: string, options: ModelResol
   let baseName = tier ? modelWithoutQuota.replace(TIER_REGEX, "") : modelWithoutQuota;
   if (isGemini35FlashModel(modelWithoutQuota)) {
     baseName = "gemini-3.5-flash";
+  } else if (isGemini38FlashModel(modelWithoutQuota)) {
+    baseName = "gemini-3.8-flash";
   }
 
   const isImageModel = IMAGE_GENERATION_MODELS.test(modelWithoutQuota);
@@ -208,6 +225,7 @@ export function resolveModelWithTier(requestedModel: string, options: ModelResol
   // For Antigravity Gemini 3 Pro / 3.5 Flash models without explicit tier, append default tier
   // Antigravity API: gemini-3-pro / gemini-3.5-flash require tier suffix (gemini-3-pro-low/high, gemini-3.5-flash-low/medium/high)
   //                  gemini-3-flash uses bare name + thinkingLevel param
+  //                  gemini-3.8-flash uses gemini-3.8-flash-tiered + thinkingLevel param
   // Pro/3.5-Flash default to -low unless an explicit tier is provided
   const isGemini3Pro = isGemini3ProModel(modelWithoutQuota);
   const isGemini3Flash = isGemini3FlashModel(modelWithoutQuota);
@@ -216,6 +234,8 @@ export function resolveModelWithTier(requestedModel: string, options: ModelResol
   if (skipAlias) {
     if (isGemini35FlashModel(modelWithoutQuota)) {
       antigravityModel = resolveGemini35FlashModelId(tier);
+    } else if (isGemini38FlashModel(modelWithoutQuota)) {
+      antigravityModel = GEMINI_38_FLASH_API_MODEL;
     } else if (isGemini3Pro && !tier && !isImageModel) {
       antigravityModel = `${modelWithoutQuota}-low`;
     } else if (isGemini3Flash && tier) {
@@ -372,7 +392,7 @@ export function resolveModelForHeaderStyle(
   if (headerStyle === "gemini-cli") {
     let transformedModel = requestedModel
       .replace(/^antigravity-/i, "")
-      .replace(/-(low|medium|high|extra-low|agent)$/i, "");
+      .replace(/-(low|medium|high|extra-low|agent|tiered)$/i, "");
 
     const hasPreviewSuffix = /-preview($|-)/i.test(transformedModel);
     if (!hasPreviewSuffix) {

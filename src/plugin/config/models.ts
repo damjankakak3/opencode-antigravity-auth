@@ -3,7 +3,9 @@ import type { ProviderModel } from "../types";
 export type ModelThinkingLevel = "minimal" | "low" | "medium" | "high";
 
 export interface ModelThinkingConfig {
-  thinkingBudget: number;
+  thinkingBudget?: number;
+  thinkingLevel?: ModelThinkingLevel;
+  includeThoughts?: boolean;
 }
 
 export interface ModelVariant {
@@ -75,6 +77,17 @@ export const OPENCODE_MODEL_DEFINITIONS: OpencodeModelDefinitions = {
       low: { thinkingLevel: "low" },
       medium: { thinkingLevel: "medium" },
       high: { thinkingLevel: "high" },
+    },
+  },
+  "antigravity-gemini-3.8-flash": {
+    name: "Gemini 3.8 Flash (Antigravity)",
+    limit: { context: 1048576, output: 65536 },
+    modalities: DEFAULT_MODALITIES,
+    // Nested thinkingConfig: OpenCode's Google SDK drops a top-level thinkingLevel option
+    variants: {
+      low: { thinkingConfig: { thinkingLevel: "low", includeThoughts: true } },
+      medium: { thinkingConfig: { thinkingLevel: "medium", includeThoughts: true } },
+      high: { thinkingConfig: { thinkingLevel: "high", includeThoughts: true } },
     },
   },
   "antigravity-claude-sonnet-4-6": {

@@ -575,6 +575,42 @@ describe("request.ts", () => {
       expect(result.streaming).toBe(false);
     });
 
+    describe("Gemini 3.8 Flash (tiered)", () => {
+      const url =
+        "https://generativelanguage.googleapis.com/v1beta/models/antigravity-gemini-3.8-flash:streamGenerateContent";
+      const prepare = (generationConfig?: Record<string, unknown>) => {
+        const result = prepareAntigravityRequest(
+          url,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              contents: [{ role: "user", parts: [{ text: "hi" }] }],
+              ...(generationConfig ? { generationConfig } : {}),
+            }),
+          },
+          mockAccessToken,
+          mockProjectId,
+        );
+        return JSON.parse(result.init.body as string);
+      };
+
+      it.each(["low", "medium", "high"] as const)(
+        "sends gemini-3.8-flash-tiered with the %s variant's thinkingLevel",
+        (level) => {
+          // Shape OpenCode's Google SDK emits for a { thinkingConfig: { thinkingLevel } } variant
+          const body = prepare({ thinkingConfig: { thinkingLevel: level, includeThoughts: true } });
+          expect(body.model).toBe("gemini-3.8-flash-tiered");
+          expect(body.request.generationConfig.thinkingConfig.thinkingLevel).toBe(level);
+        },
+      );
+
+      it("defaults to thinkingLevel low when no variant is selected", () => {
+        const body = prepare();
+        expect(body.model).toBe("gemini-3.8-flash-tiered");
+        expect(body.request.generationConfig.thinkingConfig.thinkingLevel).toBe("low");
+      });
+    });
+
     it("sets Authorization header with Bearer token", () => {
       const result = prepareAntigravityRequest(
         "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent",

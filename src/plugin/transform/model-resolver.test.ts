@@ -140,6 +140,29 @@ describe("resolveModelWithTier", () => {
       expect(result.actualModel).toBe("gemini-3-flash-agent");
       expect(result.thinkingLevel).toBe("high");
     });
+
+    it("antigravity-gemini-3.8-flash maps to API ID gemini-3.8-flash-tiered with default thinkingLevel 'low'", () => {
+      const result = resolveModelWithTier("antigravity-gemini-3.8-flash");
+      expect(result.actualModel).toBe("gemini-3.8-flash-tiered");
+      expect(result.thinkingLevel).toBe("low");
+      expect(result.isThinkingModel).toBe(true);
+    });
+
+    it.each(["low", "medium", "high"] as const)(
+      "antigravity-gemini-3.8-flash-%s keeps API ID gemini-3.8-flash-tiered and sets thinkingLevel",
+      (tier) => {
+        const result = resolveModelWithTier(`antigravity-gemini-3.8-flash-${tier}`);
+        expect(result.actualModel).toBe("gemini-3.8-flash-tiered");
+        expect(result.thinkingLevel).toBe(tier);
+        expect(result.quotaPreference).toBe("antigravity");
+      },
+    );
+
+    it("antigravity-gemini-3.8-flash-tiered passes through unchanged", () => {
+      const result = resolveModelWithTier("antigravity-gemini-3.8-flash-tiered");
+      expect(result.actualModel).toBe("gemini-3.8-flash-tiered");
+      expect(result.thinkingLevel).toBe("low");
+    });
   });
 
   describe("Claude thinking models default budget", () => {
@@ -317,6 +340,13 @@ describe("Issue #103: resolveModelForHeaderStyle", () => {
     it("transforms gemini-3.1-pro-preview to gemini-3.1-pro-low for antigravity", () => {
       const result = resolveModelForHeaderStyle("gemini-3.1-pro-preview", "antigravity");
       expect(result.actualModel).toBe("gemini-3.1-pro-low");
+      expect(result.quotaPreference).toBe("antigravity");
+    });
+
+    it("transforms gemini-3.8-flash-high to gemini-3.8-flash-tiered for antigravity", () => {
+      const result = resolveModelForHeaderStyle("gemini-3.8-flash-high", "antigravity");
+      expect(result.actualModel).toBe("gemini-3.8-flash-tiered");
+      expect(result.thinkingLevel).toBe("high");
       expect(result.quotaPreference).toBe("antigravity");
     });
 
